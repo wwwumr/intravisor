@@ -3,18 +3,22 @@ PROG_C=$(PROG).c
 
 MOUNTPOINT=/media/ext4disk
 
-DISK=disk_cap_stream.img
+TARGET=${HOME}/cheri/output/intravisor
+
+DISK=disk_${PROG}.img
 
 LOOP_DEVICE=loop9
-IMAGE_SIZE_KB=500
+IMAGE_SIZE_KB=400
 
 ESCALATE_CMD=sudo
-USER=`whoami`
 
 .DELETE_ON_ERROR:
 .PHONY: all clean
 
 all: $(DISK)
+
+install:
+	cp *.img *.yaml ${TARGET}
 
 clean:
 	rm -f $(DISK) $(PROG) *.o
@@ -35,8 +39,6 @@ $(DISK): $(PROG)
 		chown $(USER) "$@"; \
 	'
 
-install:
-	sudo mkdir -p ${INSTALL_PATH}
-	sudo cp ./*.yaml ./*.img ${INSTALL_PATH}
-
+test: $(DISK)
+	../../build/sgx-lkl-run $(DISK) app/$(PROG)
 

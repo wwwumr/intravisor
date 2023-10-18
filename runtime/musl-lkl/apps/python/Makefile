@@ -1,98 +1,66 @@
-ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-
 PROG=helloworld.py
 BUILD_DIR=Python-3.9.1
-DEST_DIR=$(ROOT_DIR)/dest
+SRC_PY=Python-3.9.1.tgz
+DEST_DIR=dest
 MOUNTPOINT=/media/ext4disk
-LIBFFI_BUILD_DIR=libffi-3.4.4
-LIBFFI_SRC=libffi-3.4.4.tar.gz
 
-CFFI_BUILD_DIR=cffi-1.15.1
-CFFI_SRC=cffi-1.15.1.tar.gz
+CFLAGS="-fPIE -fpie -O2"
+LDFLAGS="-pie"
 
+CC=../../../build/musl-host/bin/musl-clang-target
 
-CFLAGS="-I$(DEST_DIR)/usr/include"
-LDFLAGS="-L$(DEST_DIR)/usr/lib"
-
-#full path would be better
-CC=../../../build/musl-host/bin/musl-gcc
-
-P_CFG = --host=$(LKL_MUSL_HOST)  --build=$(LKL_MUSL_BUILD) --disable-ipv6 --target=$(LKL_MUSL_HOST) \
+P_CFG = --host=riscv64-linux-gnu --build=riscv64 --disable-ipv6 --target=riscv64-unknown-linux \
 		--prefix=/usr --exec-prefix=/usr --sysconfdir=/etc --localstatedir=/var --program-prefix= \
-		LIBFFI_INCLUDEDIR=abba
-
+		--disable-gtk-doc --disable-gtk-doc-html --disable-doc --disable-docs --disable-documentation \
+		--with-xmlto=no --with-fop=no --disable-dependency-tracking --disable-ipv6 --disable-nls --disable-static --disable-shared --disable-readline \
+		--disable-curses --with-libmpdec=none --with-expat=none --disable-sqlite3 --disable-openssl --disable-codecs-cjk --disable-uuid --disable-bzip2 \
+		--disable-xz --disable-zlib --disable-ossaudiodev --without-ensurepip --without-cxx-main  \
+		--disable-pydoc --disable-test-modules --disable-lib2to3 --disable-tk --disable-nis --disable-idle3 --disable-pyc-build --disable-ffi
 
 DISK=disk_python.img
+
+TARGET=${HOME}/cheri/output/intravisor
 
 LOOP_DEVICE=loop9
 IMAGE_SIZE_MB=100
 
 ESCALATE_CMD=sudo
-USER=`whoami`
 
 .DELETE_ON_ERROR:
 .PHONY: all clean
 
 all: $(DISK)
 
-install:
-	sudo mkdir -p ${INSTALL_PATH}
-	sudo cp ./*.yaml ./*.img ${INSTALL_PATH}
-
-
 clean:
 #	echo "uncomment clean"
-	make -C $(BUILD_DIR) distclean || true
-	rm -rf $(DISK) *.o $(DEST_DIR) $(CFFI_BUILD_DIR) $(LIBFFI_BUILD_DIR) *.so
+	rm -rf $(DISK) *.o $(BUILD_DIR) $(DEST_DIR)
 
 python_conf:
 	mkdir -p $(DEST_DIR)
-	cd $(BUILD_DIR) && LIBFFI_INCLUDEDIR=$(DEST_DIR)/usr/include CROSS_COMPILE_TARGET=yes CONFIG_SITE=../config.site CFLAGS=$(CFLAGS) LDFLAGS=$(LDFLAGS) CC=$(CC) ./configure $(P_CFG)
+	tar -xf $(SRC_PY) 
+	cd $(BUILD_DIR) && CONFIG_SITE=../config.site CFLAGS=$(CFLAGS) LDFLAGS=$(LDFLAGS) CC=$(CC) ./configure $(P_CFG)
 	cat $(BUILD_DIR)/pyconfig.h \
 	| grep -v "HAVE_DECL_ISFINITE"   \
 	| grep -v "HAVE_DECL_ISINF"  \
 	| grep -v "HAVE_DECL_ISNAN"   \
-	> /tmp/pyconfig.h
-	mv /tmp/pyconfig.h $(BUILD_DIR)/pyconfig.h
+	> /tmp/carrie/pyconfig.h
+	mv /tmp/carrie/pyconfig.h $(BUILD_DIR)/pyconfig.h
 
 #	| grep -v "HAVE_EXECV"   \
 #	| grep -v "HAVE_FORK"   \
 
 
 python_build: python_conf
-	CC=$(CC) CROSS_COMPILE_TARGET=yes make -C $(BUILD_DIR)
+	make -C $(BUILD_DIR)
 
 python_install: python_build
-	DESTDIR=$(DEST_DIR) make -C $(BUILD_DIR) install
+	DESTDIR=../$(DEST_DIR) make -C $(BUILD_DIR) install
 	rm -rf $(DEST_DIR)/usr/lib/libpython*.a
 	rm -rf $(DEST_DIR)/usr/lib/python*/test
 	rm -rf $(DEST_DIR)/usr/lib/python*/config-*
 
-libffi_conf:
-	mkdir -p $(DEST_DIR)
-	tar -xf $(LIBFFI_SRC) 
-	cd $(LIBFFI_BUILD_DIR) && CC=../$(CC) ./configure --host=$(LKL_MUSL_HOST) --build=$(LKL_MUSL_BUILD)  --prefix=/usr
 
-
-libffi_build: libffi_conf
-	make -C $(LIBFFI_BUILD_DIR)
-
-libffi_install: libffi_build
-	DESTDIR=$(DEST_DIR) make -C $(LIBFFI_BUILD_DIR) install
-
-#cffi requires change naming
-cffi_build:
-	tar -xf $(CFFI_SRC) 
-	cd $(CFFI_BUILD_DIR)  &&  OPT="" CFLAGS="" LDFLAGS="" LDSHARED="../../../build/musl-host/bin/musl-gcc -L../libffi-3.4.4/riscv64-unknown-linux-gnu/.libs/ -shared" CC="../../../build/musl-host/bin/musl-gcc -DHAVE_STDINT_H -DHAVE_MEMALIGN -nostdlib -I../Python-3.9.1/Include/ -I../Python-3.9.1/ -I../libffi-3.4.4/riscv64-unknown-linux-gnu/include/" python setup.py build
-
-cffi_install: cffi_build
-	cp -r $(CFFI_BUILD_DIR)/build/lib.linux-x86_64-cpython-39/cffi $(DEST_DIR)/usr/lib/python3.9/
-	cp -r $(CFFI_BUILD_DIR)/build/lib.linux-x86_64-cpython-39/_cffi_backend.cpython-39-x86_64-linux-gnu.so $(DEST_DIR)/usr/lib/python3.9/_cffi_backend.cpython-39-riscv-64-linux-gnu.so
-
-
-#$(DISK): libffi_install python_install cffi_install
-#while cffi works, we don't include it so far
-$(DISK): libffi_install python_install
+$(DISK): python_install
 #$(DISK):
 	dd if=/dev/zero of="$@" count=$(IMAGE_SIZE_MB) bs=1M
 	mkfs.ext4 "$@"
@@ -100,9 +68,7 @@ $(DISK): libffi_install python_install
 		mkdir -p $(MOUNTPOINT); \
 		mount -t ext4 -o loop "$@" $(MOUNTPOINT); \
 		mkdir -p $(MOUNTPOINT)/app; \
-		cp ./*.py  $(MOUNTPOINT)/app; \
-		REALGCC=$(REALGCC) ../../build/musl-host/bin/musl-gcc test.c -o libtest.so -shared ; \
-		cp libtest.so $(MOUNTPOINT)/app; \
+		cp $(PROG)  $(MOUNTPOINT)/app; \
 		cp -r  $(DEST_DIR)/*  $(MOUNTPOINT)/; \
 		umount $(MOUNTPOINT); \
 		chown $(USER) "$@"; \

@@ -3,13 +3,14 @@ PROG_C=$(PROG).c
 
 MOUNTPOINT=/media/ext4disk
 
-DISK=disk_cap_file.img
+TARGET=${HOME}/cheri/output/intravisor
+
+DISK=disk_hello.img
 
 LOOP_DEVICE=loop9
-IMAGE_SIZE_KB=500
+IMAGE_SIZE_KB=400
 
 ESCALATE_CMD=sudo
-USER=`whoami`
 
 .DELETE_ON_ERROR:
 .PHONY: all clean
@@ -18,6 +19,9 @@ all: $(DISK)
 
 clean:
 	rm -f $(DISK) $(PROG) *.o
+
+install:
+	cp *.img *.yaml ${TARGET}
 
 $(PROG): $(PROG_C)
 	../../build/musl-host/bin/musl-clang-target -fPIE -pie -c -g -o $@.o $(PROG_C)
@@ -35,7 +39,6 @@ $(DISK): $(PROG)
 		chown $(USER) "$@"; \
 	'
 
-install:
-	sudo mkdir -p ${INSTALL_PATH}
-	sudo cp ./*.yaml ./*.img ${INSTALL_PATH}
+test: $(DISK)
+	../../build/sgx-lkl-run $(DISK) app/$(PROG)
 

@@ -7,11 +7,10 @@ cVMs:
   callback_out: monitor
   wait: 10
   isolation:
-  - base:  0x400000000
-    size:  0x040000000
-    begin: 0x400000000
-    end:   0x440000000
-
+  - base: 0x20000000
+    size: 0x10000000
+    begin: 0x20000000
+    end: 0x30000000
 
 - name: send
   disk: disk_cap_stream.img
@@ -19,7 +18,7 @@ cVMs:
   args: /ld.so /app/cap_stream 4
   callback_out: monitor
   isolation:
-  - base:  0x440000000
-    size:  0x040000000
-    begin: 0x440000000
-    end:   0x480000000
+  - base: 0x10000000
+    size: 0x10000000
+    begin: 0x10000000
+    end: 0x20000000

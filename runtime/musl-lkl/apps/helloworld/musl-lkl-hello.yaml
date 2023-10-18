@@ -6,7 +6,7 @@ cVMs:
   args: /ld.so /app/helloworld 
   callback_out: monitor
   isolation:
-  - base:  0x400000000
-    size:  0x040000000
-    begin: 0x400000000
-    end:   0x440000000
+  - base: 0x20000000
+    size: 0x10000000
+    begin: 0x20000000
+    end: 0x30000000

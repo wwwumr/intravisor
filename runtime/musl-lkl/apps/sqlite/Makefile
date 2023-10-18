@@ -3,26 +3,25 @@ PROG_C=$(PROG).c
 
 MOUNTPOINT=/media/ext4disk
 
+TARGET=${HOME}/cheri/output/intravisor
+
 DISK=disk_sqlite.img
 
 LOOP_DEVICE=loop9
 IMAGE_SIZE_MB=100
 
 ESCALATE_CMD=sudo
-USER=`whoami`
 
 .DELETE_ON_ERROR:
 .PHONY: all clean
 
 all: $(DISK)
 
+install:
+	cp *.img *.yaml ${TARGET}
+
 clean:
 	rm -f $(DISK) $(PROG) *.o
-
-install:
-	sudo mkdir -p ${INSTALL_PATH}
-	sudo cp ./*.yaml ./*.img ${INSTALL_PATH}
-
 
 $(PROG): $(PROG_C) sqlite3.c
 	../../build/musl-host/bin/musl-clang-target -fPIE -pie -c -g -o $@.o $(PROG_C) -O2
@@ -41,4 +40,7 @@ $(DISK): $(PROG)
 		umount $(MOUNTPOINT); \
 		chown $(USER) "$@"; \
 	'
+
+test: $(DISK)
+	../../build/sgx-lkl-run $(DISK) app/$(PROG)
 

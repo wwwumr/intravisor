@@ -1,5 +1,5 @@
 # List of subdirectories to traverse
-SUBDIRS := helloworld sqlite darknet python darknet_python docker cap_file cap_stream
+SUBDIRS := helloworld sqlite docker cap_file cap_stream
 
 .PHONY: all clean install
 
